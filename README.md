@@ -4,7 +4,7 @@
 
 Realtek `r8125` 2.5G 以太网驱动的自动化打包项目。
 
-这是一个独立的打包项目，不是任何 DKMS 包仓库的 fork。项目会从可信镜像发现并下载 Realtek 驱动源码，注入本仓库维护的构建参数，然后通过 GitHub Actions 发布面向不同发行版的软件包。
+这是一个独立的打包项目，不是任何 DKMS 包仓库的 fork。项目会从可信镜像获取 Realtek 驱动源码，注入本仓库维护的构建参数，并发布面向不同发行版的软件包。
 
 当前首个支持的产物是 Debian/Proxmox VE 可用的 DKMS 源码包，包名保持为 `r8125-dkms`。后续可以在同一源码发现流程上继续扩展 OpenWrt `ipk`/`apk`、RPM、Arch 等包格式。
 
@@ -20,7 +20,7 @@ r8125-dkms_<driver-version>-<pkgrel>_all.deb
 
 ## 源码来源
 
-工作流会从镜像 release assets 中发现最新的 Realtek 源码归档。如果多个镜像提供相同驱动版本，则按当前源顺序作为优先级：
+项目从镜像 release assets 中获取 Realtek 源码归档。如果多个镜像提供相同驱动版本，则按当前源顺序作为优先级：
 
 1. `openwrt/rtl8125`
 2. `devome/r8125-dkms`
@@ -43,22 +43,9 @@ ENABLE_RSS_SUPPORT=y
 
 其中面向性能和延迟的核心参数是关闭 ASPM、关闭 EEE、启用多 TX 队列和启用 RSS。PTP 作为硬件时间戳功能保留启用。
 
-## 本地构建
+## 发布文件
 
-在 Debian 或 Ubuntu 构建主机上运行：
-
-```sh
-python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
-python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
-VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
-SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
-scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 1
-scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
-```
-
-## GitHub Releases
-
-`release-deb.yml` 支持定时运行和手动触发。每次发布包含：
+每个 Release 包含：
 
 ```text
 r8125-<driver-version>.tar.*
@@ -79,18 +66,6 @@ v<driver-version>-<pkgrel>
 ```text
 v9.017.01-1
 ```
-
-## 首次发布
-
-创建名为 `r8125-driver-packages` 的全新 GitHub 仓库，并作为普通仓库推送，不要创建为 fork。首次 push 后，在 GitHub Actions 中手动运行 `Release Debian package`：
-
-```text
-pkgrel: 1
-include_prereleases: true
-force: false
-```
-
-`Test Debian package` 会在 push 后自动运行。`Release Debian package` 也会在每周一 03:27 UTC 定时运行；如果目标 release 已存在，工作流会自动跳过发布。
 
 ## 在 Proxmox VE 或 Debian 上安装
 
@@ -120,4 +95,17 @@ sudo apt install ./r8125-dkms_<version>_all.deb
 
 ```sh
 dkms status -m r8125
+```
+
+## 本地构建
+
+需要自行构建时，可在 Debian 或 Ubuntu 构建主机上运行：
+
+```sh
+python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
+python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
+VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
+SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
+scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 1
+scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
 ```

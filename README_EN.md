@@ -4,7 +4,7 @@
 
 Automated packaging for the Realtek `r8125` 2.5G Ethernet driver.
 
-This is a standalone packaging project, not a fork of a DKMS package repository. It discovers mirrored Realtek source archives, injects build options maintained by this repository, and publishes distribution packages through GitHub Actions.
+This is a standalone packaging project, not a fork of a DKMS package repository. It obtains Realtek source archives from trusted mirrors, injects build options maintained by this repository, and publishes distribution packages for supported systems.
 
 The first supported output is a Debian/Proxmox VE DKMS source package named `r8125-dkms`. Future package backends can add OpenWrt `ipk`/`apk`, RPM, Arch, or other distribution formats without changing the upstream source discovery flow.
 
@@ -20,7 +20,7 @@ It does not contain a prebuilt kernel module. When installed on Debian or Proxmo
 
 ## Source Mirrors
 
-The workflow discovers the newest Realtek source archive from mirrored release assets. If multiple mirrors provide the same driver version, the current source order is used as the tie-breaker:
+The project obtains Realtek source archives from mirrored release assets. If multiple mirrors provide the same driver version, the current source order is used as the tie-breaker:
 
 1. `openwrt/rtl8125`
 2. `devome/r8125-dkms`
@@ -43,22 +43,9 @@ ENABLE_RSS_SUPPORT=y
 
 The performance and latency oriented options are ASPM off, EEE off, multiple TX queues, and RSS. PTP is kept enabled as a hardware timestamping feature.
 
-## Local Build
+## Release Assets
 
-On a Debian or Ubuntu build host:
-
-```sh
-python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
-python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
-VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
-SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
-scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 1
-scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
-```
-
-## GitHub Releases
-
-`release-deb.yml` can run on a schedule or manually. It publishes:
+Each release publishes:
 
 ```text
 r8125-<driver-version>.tar.*
@@ -79,18 +66,6 @@ Example:
 ```text
 v9.017.01-1
 ```
-
-## First Publication
-
-Create a new GitHub repository named `r8125-driver-packages` and push this project as a normal repository, not as a fork. After the first push, run the `Release Debian package` workflow manually from GitHub Actions:
-
-```text
-pkgrel: 1
-include_prereleases: true
-force: false
-```
-
-`Test Debian package` runs automatically after each push. `Release Debian package` also runs every Monday at 03:27 UTC and skips publishing when the target release already exists.
 
 ## Install On Proxmox VE Or Debian
 
@@ -120,4 +95,17 @@ Check DKMS status:
 
 ```sh
 dkms status -m r8125
+```
+
+## Local Build
+
+If you need to build the package yourself, run the following on a Debian or Ubuntu build host:
+
+```sh
+python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
+python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
+VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
+SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
+scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 1
+scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
 ```
