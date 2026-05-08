@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate concise release notes for a packaged r8125 driver."""
+"""Generate bilingual release notes for a packaged r8125 driver."""
 
 from __future__ import annotations
 
@@ -27,14 +27,27 @@ def main() -> int:
     with open(args.metadata, encoding="utf-8") as handle:
         metadata = json.load(handle)
     build_options = read_build_options(args.build_options)
+    build_options_text = ", ".join(f"`{option}`" for option in build_options)
 
     print(f"## r8125-dkms {args.package_version}")
     print()
+    print("### 中文")
+    print()
+    print(f"- 驱动版本：`{metadata['driver_version']}`")
+    print(f"- 源码来源：`{metadata['source']}` / `{metadata.get('repo')}`")
+    print(f"- 源码归档：`{metadata['asset_name']}`")
+    print(f"- 源码 SHA256：`{metadata['source_sha256']}`")
+    print(f"- DKMS 构建参数：{build_options_text}")
+    print()
+    print("这是一个 DKMS 源码包。安装到 Debian 或 Proxmox VE 主机后，内核模块会在目标系统上根据本机内核头文件编译。")
+    print()
+    print("### English")
+    print()
     print(f"- Driver version: `{metadata['driver_version']}`")
     print(f"- Source: `{metadata['source']}` / `{metadata.get('repo')}`")
-    print(f"- Source asset: `{metadata['asset_name']}`")
+    print(f"- Source archive: `{metadata['asset_name']}`")
     print(f"- Source SHA256: `{metadata['source_sha256']}`")
-    print("- DKMS build options: " + ", ".join(f"`{option}`" for option in build_options))
+    print(f"- DKMS build options: {build_options_text}")
     print()
     print("This is a DKMS source package. The kernel module is built on the target Debian or Proxmox VE host during package installation.")
     return 0

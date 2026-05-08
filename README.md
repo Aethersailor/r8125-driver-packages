@@ -1,44 +1,37 @@
 # r8125-driver-packages
 
-Automated packaging for the Realtek `r8125` 2.5G Ethernet driver.
+[English](README_EN.md)
 
-This is a standalone packaging project, not a fork of a DKMS package
-repository. It discovers mirrored Realtek source archives, injects local build
-options, and publishes distribution packages from this repository's workflows.
+Realtek `r8125` 2.5G 以太网驱动的自动化打包项目。
 
-The first supported output is a Debian/Proxmox VE DKMS source package named
-`r8125-dkms`. Future package backends can add OpenWrt `ipk`/`apk`, RPM, Arch,
-or other distribution formats without changing the upstream source discovery
-flow.
+这是一个独立的打包项目，不是任何 DKMS 包仓库的 fork。项目会从可信镜像发现并下载 Realtek 驱动源码，注入本仓库维护的构建参数，然后通过 GitHub Actions 发布面向不同发行版的软件包。
 
-## What This Builds
+当前首个支持的产物是 Debian/Proxmox VE 可用的 DKMS 源码包，包名保持为 `r8125-dkms`。后续可以在同一源码发现流程上继续扩展 OpenWrt `ipk`/`apk`、RPM、Arch 等包格式。
 
-The Debian package is a DKMS source package:
+## 构建产物
+
+Debian/PVE 产物是 DKMS 源码包：
 
 ```text
 r8125-dkms_<driver-version>-<pkgrel>_all.deb
 ```
 
-It does not contain a prebuilt kernel module. When installed on Debian or
-Proxmox VE, DKMS builds `r8125.ko` against the local kernel headers.
+它不包含预编译内核模块。安装到 Debian 或 Proxmox VE 后，DKMS 会使用目标系统上的内核头文件编译 `r8125.ko`。
 
-## Source Mirrors
+## 源码来源
 
-The workflow discovers the newest Realtek source archive from mirrored release
-assets. If two mirrors provide the same driver version, the current source
-order is used as the tie-breaker:
+工作流会从镜像 release assets 中发现最新的 Realtek 源码归档。如果多个镜像提供相同驱动版本，则按当前源顺序作为优先级：
 
 1. `openwrt/rtl8125`
 2. `devome/r8125-dkms`
 
-Realtek's official download site can require CAPTCHA, so it is not used as the
-primary unattended CI source.
+Realtek 官方下载站可能要求验证码，因此不作为无人值守 CI 的主源码来源。
 
-See [UPSTREAM.md](UPSTREAM.md) for source and attribution details.
+源码选择、归因和可追溯性说明见 [UPSTREAM.md](UPSTREAM.md)。
 
-## DKMS Build Options
+## DKMS 构建参数
 
-The package injects these upstream Makefile options through `dkms.conf`:
+包内的 `dkms.conf` 会注入以下上游 Makefile 参数：
 
 ```text
 CONFIG_ASPM=n
@@ -48,12 +41,11 @@ ENABLE_PTP_SUPPORT=y
 ENABLE_RSS_SUPPORT=y
 ```
 
-The performance and latency oriented options are ASPM off, EEE off, multiple TX
-queues, and RSS. PTP is enabled as an additional hardware timestamping feature.
+其中面向性能和延迟的核心参数是关闭 ASPM、关闭 EEE、启用多 TX 队列和启用 RSS。PTP 作为硬件时间戳功能保留启用。
 
-## Local Build
+## 本地构建
 
-On a Debian or Ubuntu build host:
+在 Debian 或 Ubuntu 构建主机上运行：
 
 ```sh
 python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
@@ -66,7 +58,7 @@ scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
 
 ## GitHub Releases
 
-`release-deb.yml` can run on a schedule or manually. It publishes:
+`release-deb.yml` 支持定时运行和手动触发。每次发布包含：
 
 ```text
 r8125-<driver-version>.tar.*
@@ -76,23 +68,21 @@ provenance.json
 release-notes.md
 ```
 
-Release tags follow the Debian package version:
+Release tag 与 Debian 包版本保持接近：
 
 ```text
 v<driver-version>-<pkgrel>
 ```
 
-Example:
+示例：
 
 ```text
 v9.017.01-1
 ```
 
-## First Publication
+## 首次发布
 
-Create a new GitHub repository named `r8125-driver-packages` and push this
-project as a normal repository, not as a fork. After the first push, run the
-`Release Debian package` workflow manually from GitHub Actions:
+创建名为 `r8125-driver-packages` 的全新 GitHub 仓库，并作为普通仓库推送，不要创建为 fork。首次 push 后，在 GitHub Actions 中手动运行 `Release Debian package`：
 
 ```text
 pkgrel: 1
@@ -100,33 +90,33 @@ include_prereleases: true
 force: false
 ```
 
-The first test workflow runs automatically on push. The release workflow also
-runs every Monday at 03:27 UTC and skips publishing when the target release
-already exists.
+`Test Debian package` 会在 push 后自动运行。`Release Debian package` 也会在每周一 03:27 UTC 定时运行；如果目标 release 已存在，工作流会自动跳过发布。
 
-## Install On Proxmox VE Or Debian
+## 在 Proxmox VE 或 Debian 上安装
 
-Install DKMS and matching kernel headers first:
+先安装 DKMS 和当前内核对应的 headers。
+
+Proxmox VE：
 
 ```sh
 sudo apt update
 sudo apt install dkms proxmox-default-headers
 ```
 
-For Debian instead of Proxmox VE, install the appropriate `linux-headers-*`
-package, for example:
+Debian：
 
 ```sh
+sudo apt update
 sudo apt install dkms linux-headers-amd64
 ```
 
-Then install the package:
+然后安装本项目发布的 `.deb`：
 
 ```sh
 sudo apt install ./r8125-dkms_<version>_all.deb
 ```
 
-Check DKMS status:
+检查 DKMS 状态：
 
 ```sh
 dkms status -m r8125

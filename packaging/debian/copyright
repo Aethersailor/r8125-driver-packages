@@ -6,6 +6,6 @@ Files: *
 Copyright: Realtek Semiconductor Corp. and contributors
 License: GPL-2.0-only
 
-Files: packaging/debian/* scripts/* config/* .github/* README.md UPSTREAM.md LICENSE
+Files: packaging/debian/* scripts/* config/* .github/* README.md README_EN.md UPSTREAM.md LICENSE
 Copyright: 2026 Aethersailor
 License: MIT
