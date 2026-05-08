@@ -4,9 +4,9 @@
 
 Realtek `r8125` 2.5G 以太网驱动的自动化打包项目。
 
-这是一个独立的打包项目，不是任何 DKMS 包仓库的 fork。项目会从可信镜像获取 Realtek 驱动源码，注入本仓库维护的构建参数，并发布面向不同发行版的软件包。
+项目会从可信镜像获取 Realtek 驱动源码，注入本仓库维护的构建参数，并发布面向不同发行版的软件包。
 
-当前首个支持的产物是 Debian/Proxmox VE 可用的 DKMS 源码包，包名保持为 `r8125-dkms`。后续可以在同一源码发现流程上继续扩展 OpenWrt `ipk`/`apk`、RPM、Arch 等包格式。
+当前支持 Debian/Proxmox VE 可用的 DKMS 源码包，包名保持为 `r8125-dkms`。后续可以在同一源码发现流程上继续扩展 OpenWrt `ipk`/`apk`、RPM、Arch 等包格式。
 
 ## 构建产物
 

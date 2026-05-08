@@ -4,9 +4,9 @@
 
 Automated packaging for the Realtek `r8125` 2.5G Ethernet driver.
 
-This is a standalone packaging project, not a fork of a DKMS package repository. It obtains Realtek source archives from trusted mirrors, injects build options maintained by this repository, and publishes distribution packages for supported systems.
+The project obtains Realtek source archives from trusted mirrors, injects build options maintained by this repository, and publishes distribution packages for supported systems.
 
-The first supported output is a Debian/Proxmox VE DKMS source package named `r8125-dkms`. Future package backends can add OpenWrt `ipk`/`apk`, RPM, Arch, or other distribution formats without changing the upstream source discovery flow.
+The current output is a Debian/Proxmox VE DKMS source package named `r8125-dkms`. Future package backends can add OpenWrt `ipk`/`apk`, RPM, Arch, or other distribution formats without changing the upstream source discovery flow.
 
 ## What This Builds
 
