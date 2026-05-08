@@ -1,0 +1,16 @@
+Package: r8125-dkms
+Version: @PACKAGE_VERSION@
+Priority: optional
+Section: non-free/kernel
+Maintainer: Aethersailor <noreply@github.com>
+Architecture: all
+Depends: dkms
+Recommends: proxmox-default-headers | proxmox-headers | pve-headers | linux-headers-amd64
+Provides: r8125-dkms
+Conflicts: realtek-r8125-dkms
+Replaces: realtek-r8125-dkms
+Homepage: https://github.com/Aethersailor/r8125-driver-packages
+Description: DKMS source for the Realtek r8125 network driver
+ This package provides DKMS source for the Realtek r8125 2.5G Ethernet
+ driver. It is built from mirrored Realtek source archives with DKMS build
+ options tuned for throughput, latency, and Proxmox VE/Debian use.

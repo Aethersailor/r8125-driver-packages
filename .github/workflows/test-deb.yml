@@ -1,0 +1,49 @@
+name: Test Debian package
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install test tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Static checks
+        run: |
+          python3 -m compileall scripts
+          shellcheck scripts/*.sh packaging/debian/postinst packaging/debian/prerm
+
+      - name: Discover latest source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
+          cat build-source.json
+
+      - name: Fetch source
+        run: |
+          python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
+          cat source-metadata.json
+
+      - name: Build deb
+        run: |
+          VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
+          scripts/build-deb.sh --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" --version "$VERSION" --pkgrel 1
+
+      - name: Smoke test deb
+        run: |
+          VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
+          scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"

@@ -1,0 +1,10 @@
+build/
+dist/
+downloads/
+*.deb
+*.tar.bz2
+*.tar.gz
+*.tar.xz
+*.log
+__pycache__/
+*.pyc

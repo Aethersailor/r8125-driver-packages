@@ -1,0 +1,8 @@
+# Source priority for automated Realtek r8125 tarball discovery.
+sources:
+  - name: openwrt
+    repo: openwrt/rtl8125
+    asset_pattern: 'r8125-[0-9][0-9.]*\.tar\.(bz2|gz|xz)$'
+  - name: devome
+    repo: devome/r8125-dkms
+    asset_pattern: 'r8125-[0-9][0-9.]*\.tar\.(bz2|gz|xz)$'
