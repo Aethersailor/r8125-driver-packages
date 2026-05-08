@@ -67,28 +67,97 @@ v<driver-version>-<pkgrel>
 v9.017.01-1
 ```
 
-## 在 Proxmox VE 或 Debian 上安装
+## 安装
 
-先安装 DKMS 和当前内核对应的 headers。
+安装前请先下载 Release 中的 `r8125-dkms_<version>_all.deb`。本包是 DKMS 源码包，安装时会在目标系统上为当前内核编译驱动模块。
 
-Proxmox VE：
+<details>
+<summary>Proxmox VE</summary>
+
+以下流程参考了 [Evine 的 PVE RTL8125 驱动安装教程](https://evine.win/p/pve-install-realtek-8125-driver/)，并针对本项目发布的包名整理。
+
+更新系统并安装 DKMS 与内核 headers：
 
 ```sh
 sudo apt update
+sudo apt upgrade
 sudo apt install dkms proxmox-default-headers
 ```
 
-Debian：
+如果使用较旧的 PVE 版本，`proxmox-default-headers` 不可用时可改用 `pve-headers`。
+
+如需为当前系统中已安装的多个 PVE 内核准备 headers，可执行：
+
+```sh
+headers=$(dpkg -l | awk '/^ii.+kernel-[0-9]+\.[0-9]+\.[0-9]/{gsub(/-signed/, ""); gsub(/kernel/, "headers"); print $2}' | tr "\n" " ")
+sudo apt install -y $headers
+```
+
+安装下载好的 DKMS 包：
+
+```sh
+sudo dpkg -i r8125-dkms_*.deb
+```
+
+如果需要为旧内核补装模块，先查看 DKMS 状态和已安装内核版本：
+
+```sh
+dkms status
+dpkg -l | awk '/^ii.+kernel-[0-9]+\.[0-9]+\.[0-9]/{gsub(/proxmox-kernel-|pve-kernel-|-signed/, ""); print $2}'
+```
+
+然后按需指定驱动版本和内核版本：
+
+```sh
+sudo dkms install r8125/<driver_version> -k <kernel_version>
+```
+
+禁用内核自带的 `r8169` 驱动，避免重启后继续加载旧驱动：
+
+```sh
+echo "blacklist r8169" | sudo tee -a /etc/modprobe.d/r8125-dkms.conf
+sudo update-grub
+sudo update-initramfs -u -k all
+sudo reboot
+```
+
+重启后确认网卡已加载 `r8125`：
+
+```sh
+lspci | grep RTL8125
+lspci -s <pci-id> -k
+```
+
+</details>
+
+<details>
+<summary>Debian</summary>
+
+更新系统并安装 DKMS 与当前内核 headers：
 
 ```sh
 sudo apt update
+sudo apt install dkms linux-headers-$(uname -r)
+```
+
+如果使用 Debian 通用内核元包，也可以安装：
+
+```sh
 sudo apt install dkms linux-headers-amd64
 ```
 
-然后安装本项目发布的 `.deb`：
+安装下载好的 DKMS 包：
 
 ```sh
-sudo apt install ./r8125-dkms_<version>_all.deb
+sudo dpkg -i r8125-dkms_*.deb
+```
+
+如需切换掉内核自带的 `r8169` 驱动，可禁用它并重建 initramfs：
+
+```sh
+echo "blacklist r8169" | sudo tee -a /etc/modprobe.d/r8125-dkms.conf
+sudo update-initramfs -u -k all
+sudo reboot
 ```
 
 检查 DKMS 状态：
@@ -96,6 +165,15 @@ sudo apt install ./r8125-dkms_<version>_all.deb
 ```sh
 dkms status -m r8125
 ```
+
+确认网卡已加载 `r8125`：
+
+```sh
+lspci | grep RTL8125
+lspci -s <pci-id> -k
+```
+
+</details>
 
 ## 本地构建
 
