@@ -9,14 +9,6 @@ on:
         description: "Debian package revision"
         required: false
         default: "1"
-      include_prereleases:
-        description: "Include upstream prerelease source releases"
-        required: false
-        default: "true"
-        type: choice
-        options:
-          - "true"
-          - "false"
       force:
         description: "Replace the existing release and tag if they already exist"
         required: false
@@ -41,18 +33,13 @@ jobs:
         id: inputs
         run: |
           echo "pkgrel=${{ github.event.inputs.pkgrel || '1' }}" >> "$GITHUB_OUTPUT"
-          echo "include_prereleases=${{ github.event.inputs.include_prereleases || 'true' }}" >> "$GITHUB_OUTPUT"
           echo "force=${{ github.event.inputs.force || 'false' }}" >> "$GITHUB_OUTPUT"
 
       - name: Discover latest source
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          EXTRA_ARGS=""
-          if [ "${{ steps.inputs.outputs.include_prereleases }}" = "true" ]; then
-            EXTRA_ARGS="--include-prereleases"
-          fi
-          python3 scripts/discover-source.py $EXTRA_ARGS --pretty > build-source.json
+          python3 scripts/discover-source.py --pretty > build-source.json
           cat build-source.json
 
       - name: Compute release version
@@ -146,15 +133,10 @@ jobs:
       - name: Create GitHub release
         if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'
         run: |
-          RELEASE_FLAGS=()
-          if [ "$(python3 -c 'import json; print(str(json.load(open("source-metadata.json"))["prerelease"]).lower())')" = "true" ]; then
-            RELEASE_FLAGS+=(--prerelease)
-          fi
           gh release create "${{ steps.version.outputs.tag }}" \
             --title "${{ steps.version.outputs.tag }}" \
             --target "$GITHUB_SHA" \
             --notes-file dist/release-notes.md \
-            "${RELEASE_FLAGS[@]}" \
             dist/r8125-${{ steps.version.outputs.driver_version }}.tar.* \
             dist/r8125-dkms_${{ steps.version.outputs.package_version }}_all.deb \
             dist/SHA256SUMS \

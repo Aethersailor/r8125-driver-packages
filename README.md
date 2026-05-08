@@ -20,12 +20,9 @@ r8125-dkms_<driver-version>-<pkgrel>_all.deb
 
 ## 源码来源
 
-项目从镜像 release assets 中获取 Realtek 源码归档。如果多个镜像提供相同驱动版本，则按当前源顺序作为优先级：
+项目从 `openwrt/rtl8125` 的 release assets 中获取 Realtek 源码归档。
 
-1. `openwrt/rtl8125`
-2. `devome/r8125-dkms`
-
-Realtek 官方下载站可能要求验证码，因此不作为无人值守 CI 的主源码来源。
+Realtek 官方下载站可能要求验证码，因此不作为无人值守构建的主源码来源。
 
 源码选择、归因和可追溯性说明见 [UPSTREAM.md](UPSTREAM.md)。
 
@@ -180,7 +177,7 @@ lspci -s <pci-id> -k
 需要自行构建时，可在 Debian 或 Ubuntu 构建主机上运行：
 
 ```sh
-python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
+python3 scripts/discover-source.py --pretty > build-source.json
 python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
 VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
 SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"

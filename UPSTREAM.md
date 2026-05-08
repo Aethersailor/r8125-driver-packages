@@ -2,11 +2,9 @@
 
 This repository does not vendor the Realtek `r8125` driver source in Git.
 
-Package builds use mirrored Realtek source archives. The current mirror
-priority is:
+Package builds use mirrored Realtek source archives from:
 
 1. `openwrt/rtl8125`
-2. `devome/r8125-dkms`
 
 The downloaded source archive is republished as a release asset together with
 the generated Debian package, `SHA256SUMS`, and `provenance.json`.

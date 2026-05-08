@@ -19,12 +19,7 @@ DEFAULT_SOURCES = [
         "name": "openwrt",
         "repo": "openwrt/rtl8125",
         "asset_pattern": r"r8125-[0-9][0-9.]*\.tar\.(bz2|gz|xz)$",
-    },
-    {
-        "name": "devome",
-        "repo": "devome/r8125-dkms",
-        "asset_pattern": r"r8125-[0-9][0-9.]*\.tar\.(bz2|gz|xz)$",
-    },
+    }
 ]
 
 
@@ -96,7 +91,7 @@ def asset_version(asset_name: str) -> str | None:
     return match.group(1) if match else None
 
 
-def candidates_for_source(source: dict[str, str], include_prereleases: bool) -> list[SourceAsset]:
+def candidates_for_source(source: dict[str, str]) -> list[SourceAsset]:
     repo = source["repo"]
     pattern = re.compile(source.get("asset_pattern") or DEFAULT_SOURCES[0]["asset_pattern"])
     releases = github_json(f"https://api.github.com/repos/{repo}/releases?per_page=20")
@@ -105,7 +100,7 @@ def candidates_for_source(source: dict[str, str], include_prereleases: bool) -> 
     for release in releases:
         if release.get("draft"):
             continue
-        if release.get("prerelease") and not include_prereleases:
+        if release.get("prerelease"):
             continue
         for asset in release.get("assets", []):
             name = asset.get("name", "")
@@ -133,7 +128,6 @@ def candidates_for_source(source: dict[str, str], include_prereleases: bool) -> 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", default="config/sources.yml")
-    parser.add_argument("--include-prereleases", action="store_true")
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args()
 
@@ -141,7 +135,7 @@ def main() -> int:
     errors: list[str] = []
     for source in parse_sources(args.config):
         try:
-            all_candidates.extend(candidates_for_source(source, args.include_prereleases))
+            all_candidates.extend(candidates_for_source(source))
         except Exception as exc:  # noqa: BLE001 - keep source fallback resilient.
             errors.append(f"{source.get('name', source.get('repo', 'unknown'))}: {exc}")
 

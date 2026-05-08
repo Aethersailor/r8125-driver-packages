@@ -20,12 +20,9 @@ It does not contain a prebuilt kernel module. When installed on Debian or Proxmo
 
 ## Source Mirrors
 
-The project obtains Realtek source archives from mirrored release assets. If multiple mirrors provide the same driver version, the current source order is used as the tie-breaker:
+The project obtains Realtek source archives from the `openwrt/rtl8125` release assets.
 
-1. `openwrt/rtl8125`
-2. `devome/r8125-dkms`
-
-Realtek's official download site can require CAPTCHA, so it is not used as the primary unattended CI source.
+Realtek's official download site can require CAPTCHA, so it is not used as the primary source for unattended builds.
 
 See [UPSTREAM.md](UPSTREAM.md) for source attribution and provenance details.
 
@@ -180,7 +177,7 @@ lspci -s <pci-id> -k
 If you need to build the package yourself, run the following on a Debian or Ubuntu build host:
 
 ```sh
-python3 scripts/discover-source.py --include-prereleases --pretty > build-source.json
+python3 scripts/discover-source.py --pretty > build-source.json
 python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
 VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
 SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
