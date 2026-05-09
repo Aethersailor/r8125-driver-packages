@@ -8,6 +8,8 @@ The project obtains Realtek source archives from trusted mirrors, injects build 
 
 The current output is a Debian/Proxmox VE DKMS source package named `r8125-dkms`. Future package backends can add OpenWrt `ipk`/`apk`, RPM, Arch, or other distribution formats without changing the upstream source discovery flow.
 
+The DKMS packaging and release flow is informed by the approach used in [`devome/r8125-dkms`](https://github.com/devome/r8125-dkms); source selection, build options, and release artifacts are maintained independently in this repository.
+
 ## What This Builds
 
 The Debian/PVE artifact is a DKMS source package:

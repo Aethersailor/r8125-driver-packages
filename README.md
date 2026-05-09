@@ -8,6 +8,8 @@ Realtek `r8125` 2.5G 以太网驱动的自动化打包项目。
 
 当前支持 Debian/Proxmox VE 可用的 DKMS 源码包，包名保持为 `r8125-dkms`。后续可以在同一源码发现流程上继续扩展 OpenWrt `ipk`/`apk`、RPM、Arch 等包格式。
 
+项目的 DKMS 打包与发布流程参考了 [`devome/r8125-dkms`](https://github.com/devome/r8125-dkms) 的实现思路；源码来源、构建参数与发布产物由本仓库独立维护。
+
 ## 构建产物
 
 Debian/PVE 产物是 DKMS 源码包：
