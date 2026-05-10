@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       pkgrel:
-        description: "Debian package revision"
+        description: "Debian package revision (empty for auto)"
         required: false
-        default: "1"
+        default: ""
       force:
         description: "Replace the existing release and tag if they already exist"
         required: false
@@ -32,7 +32,7 @@ jobs:
       - name: Resolve inputs
         id: inputs
         run: |
-          echo "pkgrel=${{ github.event.inputs.pkgrel || '1' }}" >> "$GITHUB_OUTPUT"
+          echo "pkgrel=${{ github.event.inputs.pkgrel }}" >> "$GITHUB_OUTPUT"
           echo "force=${{ github.event.inputs.force || 'false' }}" >> "$GITHUB_OUTPUT"
 
       - name: Discover latest source
@@ -46,9 +46,18 @@ jobs:
         id: version
         run: |
           DRIVER_VERSION="$(python3 -c 'import json; print(json.load(open("build-source.json"))["driver_version"])')"
-          PACKAGE_VERSION="${DRIVER_VERSION}-${{ steps.inputs.outputs.pkgrel }}"
+          INPUT_PKGREL="${{ steps.inputs.outputs.pkgrel }}"
+          if [[ -n "$INPUT_PKGREL" ]]; then
+            FINAL_PKGREL="$INPUT_PKGREL"
+          elif [[ "$DRIVER_VERSION" == "9.016.01" ]]; then
+            FINAL_PKGREL="2"
+          else
+            FINAL_PKGREL="1"
+          fi
+          PACKAGE_VERSION="${DRIVER_VERSION}-${FINAL_PKGREL}"
           TAG="v${PACKAGE_VERSION}"
           echo "driver_version=$DRIVER_VERSION" >> "$GITHUB_OUTPUT"
+          echo "pkgrel=$FINAL_PKGREL" >> "$GITHUB_OUTPUT"
           echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
@@ -76,7 +85,7 @@ jobs:
           scripts/build-deb.sh \
             --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" \
             --version "${{ steps.version.outputs.driver_version }}" \
-            --pkgrel "${{ steps.inputs.outputs.pkgrel }}"
+            --pkgrel "${{ steps.version.outputs.pkgrel }}"
 
       - name: Smoke test deb
         if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'

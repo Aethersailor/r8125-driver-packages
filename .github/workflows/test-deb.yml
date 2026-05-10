@@ -41,9 +41,11 @@ jobs:
       - name: Build deb
         run: |
           VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
-          scripts/build-deb.sh --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" --version "$VERSION" --pkgrel 1
+          if [[ "$VERSION" == "9.016.01" ]]; then PKGREL="2"; else PKGREL="1"; fi
+          scripts/build-deb.sh --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" --version "$VERSION" --pkgrel "$PKGREL"
 
       - name: Smoke test deb
         run: |
           VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
-          scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
+          if [[ "$VERSION" == "9.016.01" ]]; then PKGREL="2"; else PKGREL="1"; fi
+          scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-${PKGREL}_all.deb" "$VERSION"

@@ -73,6 +73,16 @@ UPSTREAM_ROOT="${UPSTREAM_ROOTS[0]}"
 
 find "$UPSTREAM_ROOT/src" -mindepth 1 -maxdepth 1 ! -name 'Makefile_linux24x' -exec cp -a {} "$SRC_DIR/" \;
 
+PATCH_DIR="$ROOT_DIR/patches/$DRIVER_VERSION"
+if [[ -d "$PATCH_DIR" ]]; then
+    echo "Applying patches for r8125 $DRIVER_VERSION"
+    for patch_file in "$PATCH_DIR"/*.patch; do
+        [[ -e "$patch_file" ]] || continue
+        echo "Applying patch: $(basename "$patch_file")"
+        patch -d "$SRC_DIR" -p1 < "$patch_file"
+    done
+fi
+
 if [[ -f "$UPSTREAM_ROOT/README" ]]; then
     install -m 0644 "$UPSTREAM_ROOT/README" "$DOC_DIR/README"
 fi

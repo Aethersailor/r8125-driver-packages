@@ -42,6 +42,8 @@ ENABLE_RSS_SUPPORT=y
 
 其中面向性能和延迟的核心参数是关闭 ASPM、关闭 EEE、启用多 TX 队列和启用 RSS。PTP 作为硬件时间戳功能保留启用。
 
+> **说明**: 对于 r8125 9.016.01，Debian DKMS 构建会在 PTP timer 初始化路径上应用一个针对较新 Linux 内核（不再提供 `hrtimer_init()`）的兼容性补丁。PTP 支持将继续保持启用状态。
+
 ## 发布文件
 
 每个 Release 包含：
@@ -65,6 +67,8 @@ v<driver-version>-<pkgrel>
 ```text
 v9.017.01-1
 ```
+
+*(如果是针对 9.016.01 发布的兼容性修复包，则示例为 `v9.016.01-2`)*
 
 ## 安装
 
@@ -183,6 +187,7 @@ python3 scripts/discover-source.py --pretty > build-source.json
 python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
 VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
 SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
-scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 1
-scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
+# 注意：以下示例使用了 9.016.01 修复包的 pkgrel 2。普通版本默认 pkgrel 为 1。
+scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 2
+scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-2_all.deb" "$VERSION"
 ```

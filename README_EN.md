@@ -42,6 +42,8 @@ ENABLE_RSS_SUPPORT=y
 
 The performance and latency oriented options are ASPM off, EEE off, multiple TX queues, and RSS. PTP is kept enabled as a hardware timestamping feature.
 
+> **Note**: For r8125 9.016.01, the Debian DKMS build applies a compatibility patch for newer Linux kernels where `hrtimer_init()` is no longer available in the PTP timer initialization path. PTP support remains enabled.
+
 ## Release Assets
 
 Each release publishes:
@@ -65,6 +67,8 @@ Example:
 ```text
 v9.017.01-1
 ```
+
+*(For the 9.016.01 compatibility fix package, the example would be `v9.016.01-2`)*
 
 ## Installation
 
@@ -183,6 +187,7 @@ python3 scripts/discover-source.py --pretty > build-source.json
 python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
 VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["driver_version"])')"
 SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
-scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 1
-scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-1_all.deb" "$VERSION"
+# Note: The example below uses pkgrel 2 for the 9.016.01 fix package. Normal versions default to pkgrel 1.
+scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 2
+scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-2_all.deb" "$VERSION"
 ```
