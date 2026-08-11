@@ -2,7 +2,7 @@ name: Release Debian package
 
 on:
   schedule:
-    - cron: "27 3 * * 1"
+    - cron: "43 4 * * *"
   workflow_dispatch:
     inputs:
       pkgrel:
@@ -21,19 +21,20 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-debian-package
+  cancel-in-progress: false
+
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Resolve inputs
-        id: inputs
-        run: |
-          echo "pkgrel=${{ github.event.inputs.pkgrel }}" >> "$GITHUB_OUTPUT"
-          echo "force=${{ github.event.inputs.force || 'false' }}" >> "$GITHUB_OUTPUT"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Discover latest source
         env:
@@ -42,67 +43,76 @@ jobs:
           python3 scripts/discover-source.py --pretty > build-source.json
           cat build-source.json
 
-      - name: Compute release version
-        id: version
-        run: |
-          DRIVER_VERSION="$(python3 -c 'import json; print(json.load(open("build-source.json"))["driver_version"])')"
-          INPUT_PKGREL="${{ steps.inputs.outputs.pkgrel }}"
-          if [[ -n "$INPUT_PKGREL" ]]; then
-            FINAL_PKGREL="$INPUT_PKGREL"
-          elif [[ "$DRIVER_VERSION" == "9.016.01" ]]; then
-            FINAL_PKGREL="2"
-          else
-            FINAL_PKGREL="1"
-          fi
-          PACKAGE_VERSION="${DRIVER_VERSION}-${FINAL_PKGREL}"
-          TAG="v${PACKAGE_VERSION}"
-          echo "driver_version=$DRIVER_VERSION" >> "$GITHUB_OUTPUT"
-          echo "pkgrel=$FINAL_PKGREL" >> "$GITHUB_OUTPUT"
-          echo "package_version=$PACKAGE_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-
-      - name: Check existing release
-        id: existing
-        if: steps.inputs.outputs.force != 'true'
-        run: |
-          if gh release view "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          GH_TOKEN: ${{ github.token }}
-
       - name: Fetch source
-        if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'
         run: |
           python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
           cat source-metadata.json
 
+      - name: Plan release
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          INPUT_PKGREL: ${{ github.event.inputs.pkgrel || '' }}
+          FORCE_RELEASE: ${{ github.event.inputs.force || 'false' }}
+        run: |
+          ARGS=(
+            --metadata source-metadata.json
+            --repository "$GITHUB_REPOSITORY"
+            --head-sha "$GITHUB_SHA"
+            --github-output "$GITHUB_OUTPUT"
+            --summary "$GITHUB_STEP_SUMMARY"
+            --pretty
+          )
+          if [[ -n "$INPUT_PKGREL" ]]; then
+            ARGS+=(--pkgrel "$INPUT_PKGREL")
+          fi
+          if [[ "$FORCE_RELEASE" == "true" ]]; then
+            ARGS+=(--force)
+          fi
+          python3 scripts/release_plan.py "${ARGS[@]}"
+
+      - name: Install build and compile test tools
+        if: steps.plan.outputs.should_release == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            dkms \
+            linux-headers-generic \
+            linux-headers-generic-hwe-24.04
+
       - name: Build deb
-        if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'
+        if: steps.plan.outputs.should_release == 'true'
         run: |
           scripts/build-deb.sh \
             --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" \
-            --version "${{ steps.version.outputs.driver_version }}" \
-            --pkgrel "${{ steps.version.outputs.pkgrel }}"
+            --version "${{ steps.plan.outputs.driver_version }}" \
+            --pkgrel "${{ steps.plan.outputs.pkgrel }}"
 
       - name: Smoke test deb
-        if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'
+        if: steps.plan.outputs.should_release == 'true'
         run: |
           scripts/smoke-test-deb.sh \
-            "dist/r8125-dkms_${{ steps.version.outputs.package_version }}_all.deb" \
-            "${{ steps.version.outputs.driver_version }}"
+            "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb" \
+            "${{ steps.plan.outputs.driver_version }}"
+
+      - name: Compile DKMS module
+        if: steps.plan.outputs.should_release == 'true'
+        run: |
+          sudo scripts/compile-test-dkms.sh \
+            "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb" \
+            "${{ steps.plan.outputs.driver_version }}" \
+            2
 
       - name: Prepare release assets
-        if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'
+        if: steps.plan.outputs.should_release == 'true'
         run: |
           SOURCE_ASSET="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["asset_name"])')"
           cp "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" "dist/$SOURCE_ASSET"
           python3 scripts/make-release-notes.py \
             --metadata source-metadata.json \
             --build-options config/build-options.env \
-            --package-version "${{ steps.version.outputs.package_version }}" > dist/release-notes.md
+            --package-version "${{ steps.plan.outputs.package_version }}" > dist/release-notes.md
           python3 - <<'PY'
           import json
           import os
@@ -113,8 +123,12 @@ jobs:
           metadata["package_name"] = "r8125-dkms"
           metadata["package_version"] = os.environ["PACKAGE_VERSION"]
           metadata["release_tag"] = os.environ["RELEASE_TAG"]
+          metadata["source_commit_sha"] = os.environ["GITHUB_SHA"]
+          metadata["package_recipe_sha256"] = os.environ["PACKAGE_RECIPE_SHA256"]
+          metadata["release_reason"] = os.environ["RELEASE_REASON"]
           metadata["build_time_utc"] = datetime.now(timezone.utc).isoformat()
           metadata["github_run_id"] = os.environ.get("GITHUB_RUN_ID")
+          metadata["github_run_attempt"] = os.environ.get("GITHUB_RUN_ATTEMPT")
           build_options = {}
           with open("config/build-options.env", encoding="utf-8") as handle:
               for line in handle:
@@ -129,25 +143,27 @@ jobs:
           PY
           (cd dist && sha256sum * > SHA256SUMS)
         env:
-          PACKAGE_VERSION: ${{ steps.version.outputs.package_version }}
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          PACKAGE_VERSION: ${{ steps.plan.outputs.package_version }}
+          RELEASE_TAG: ${{ steps.plan.outputs.tag }}
+          PACKAGE_RECIPE_SHA256: ${{ steps.plan.outputs.recipe_sha256 }}
+          RELEASE_REASON: ${{ steps.plan.outputs.reason }}
 
       - name: Remove existing release for forced rebuild
-        if: steps.inputs.outputs.force == 'true'
+        if: steps.plan.outputs.replace_existing == 'true'
         run: |
-          gh release delete "${{ steps.version.outputs.tag }}" --yes --cleanup-tag || true
+          gh release delete "${{ steps.plan.outputs.tag }}" --yes --cleanup-tag
         env:
           GH_TOKEN: ${{ github.token }}
 
       - name: Create GitHub release
-        if: steps.inputs.outputs.force == 'true' || steps.existing.outputs.exists != 'true'
+        if: steps.plan.outputs.should_release == 'true'
         run: |
-          gh release create "${{ steps.version.outputs.tag }}" \
-            --title "${{ steps.version.outputs.tag }}" \
+          gh release create "${{ steps.plan.outputs.tag }}" \
+            --title "${{ steps.plan.outputs.tag }}" \
             --target "$GITHUB_SHA" \
             --notes-file dist/release-notes.md \
-            dist/r8125-${{ steps.version.outputs.driver_version }}.tar.* \
-            dist/r8125-dkms_${{ steps.version.outputs.package_version }}_all.deb \
+            dist/r8125-${{ steps.plan.outputs.driver_version }}.tar.* \
+            dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb \
             dist/SHA256SUMS \
             dist/provenance.json \
             dist/release-notes.md
