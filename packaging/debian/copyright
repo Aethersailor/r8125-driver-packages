@@ -1,6 +1,8 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: r8125
-Source: https://github.com/openwrt/rtl8125
+Source: https://www.realtek.com/Download/List?cate_id=584
+Comment: Builds retrieve the upstream archive through the configured
+ openwrt/rtl8125 and danixland/r8125 mirrors.
 
 Files: *
 Copyright: Realtek Semiconductor Corp. and contributors

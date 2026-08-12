@@ -22,9 +22,14 @@ r8125-dkms_<driver-version>-<pkgrel>_all.deb
 
 ## 源码来源
 
-项目从 `openwrt/rtl8125` 的 release assets 中获取 Realtek 源码归档。
+项目从以下 GitHub release assets 中获取 Realtek 源码归档：
 
-Realtek 官方下载站可能要求验证码，因此不作为无人值守构建的主源码来源。
+1. `openwrt/rtl8125`
+2. `danixland/r8125`
+
+自动发现会先读取 Realtek 官方下载列表，镜像版本不得高于官方公布的最新版本。同版本存在多个镜像时，优先使用列表中靠前的来源；因此 OpenWrt 更新后会自动恢复为首选来源。
+
+Realtek 官方下载过程可能要求确认或验证码，因此官方列表只作为版本权威，不直接用于无人值守下载。镜像资产必须提供 GitHub 记录的 SHA256，下载完成后还会再次计算并核对摘要。
 
 源码选择、归因和可追溯性说明见 [UPSTREAM.md](UPSTREAM.md)。
 

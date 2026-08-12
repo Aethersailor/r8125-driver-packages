@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.request
@@ -31,11 +32,21 @@ def download(url: str, path: str) -> None:
             output.write(chunk)
 
 
+def normalize_sha256(value: str) -> str:
+    normalized = value.lower()
+    if normalized.startswith("sha256:"):
+        normalized = normalized.split(":", 1)[1]
+    if not re.fullmatch(r"[0-9a-f]{64}", normalized):
+        raise ValueError("source metadata must contain a valid SHA256 digest")
+    return normalized
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--metadata", help="Metadata JSON from discover-source.py")
     parser.add_argument("--url", help="Explicit source URL")
     parser.add_argument("--version", help="Driver version for explicit URL")
+    parser.add_argument("--sha256", help="Expected SHA256 for an explicit source URL")
     parser.add_argument("--out-dir", default="downloads")
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args()
@@ -43,7 +54,7 @@ def main() -> int:
     if args.metadata:
         with open(args.metadata, encoding="utf-8") as handle:
             metadata = json.load(handle)
-    elif args.url and args.version:
+    elif args.url and args.version and args.sha256:
         name = os.path.basename(args.url)
         metadata = {
             "source": "manual",
@@ -53,9 +64,11 @@ def main() -> int:
             "driver_version": args.version,
             "asset_name": name,
             "asset_url": args.url,
-            "digest": None,
+            "digest": f"sha256:{normalize_sha256(args.sha256)}",
             "prerelease": False,
         }
+    elif args.url or args.version or args.sha256:
+        parser.error("--url, --version, and --sha256 must be used together")
     else:
         result = subprocess.run(
             [sys.executable, "scripts/discover-source.py"],
@@ -65,17 +78,15 @@ def main() -> int:
         )
         metadata = json.loads(result.stdout)
 
+    expected_sha256 = normalize_sha256(str(metadata.get("digest", "")))
     os.makedirs(args.out_dir, exist_ok=True)
     out_path = os.path.join(args.out_dir, metadata["asset_name"])
     if not os.path.exists(out_path):
         download(metadata["asset_url"], out_path)
 
     actual_sha256 = sha256_file(out_path)
-    expected = metadata.get("digest")
-    if expected and expected.startswith("sha256:"):
-        expected_sha256 = expected.split(":", 1)[1].lower()
-        if expected_sha256 != actual_sha256:
-            raise RuntimeError(f"sha256 mismatch for {out_path}: {actual_sha256} != {expected_sha256}")
+    if expected_sha256 != actual_sha256:
+        raise RuntimeError(f"sha256 mismatch for {out_path}: {actual_sha256} != {expected_sha256}")
 
     metadata["source_path"] = out_path
     metadata["source_sha256"] = actual_sha256

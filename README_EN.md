@@ -22,9 +22,14 @@ It does not contain a prebuilt kernel module. When installed on Debian or Proxmo
 
 ## Source Mirrors
 
-The project obtains Realtek source archives from the `openwrt/rtl8125` release assets.
+The project obtains Realtek source archives from these GitHub release assets:
 
-Realtek's official download site can require CAPTCHA, so it is not used as the primary source for unattended builds.
+1. `openwrt/rtl8125`
+2. `danixland/r8125`
+
+Discovery first reads Realtek's official download list and rejects mirror versions newer than Realtek's latest published version. When multiple mirrors provide the same version, the source listed first wins, so OpenWrt automatically becomes preferred again after it catches up.
+
+The Realtek download flow can require confirmation or CAPTCHA, so the official list is used as the version authority rather than as the unattended download source. Mirror assets must have a GitHub-recorded SHA256 digest, which is recomputed and verified after download.
 
 See [UPSTREAM.md](UPSTREAM.md) for source attribution and provenance details.
 
