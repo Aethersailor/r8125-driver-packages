@@ -112,6 +112,7 @@ jobs:
           python3 scripts/make-release-notes.py \
             --metadata source-metadata.json \
             --build-options config/build-options.env \
+            --repository "$GITHUB_REPOSITORY" \
             --package-version "${{ steps.plan.outputs.package_version }}" > dist/release-notes.md
           python3 - <<'PY'
           import json
@@ -158,14 +159,15 @@ jobs:
       - name: Create GitHub release
         if: steps.plan.outputs.should_release == 'true'
         run: |
+          SOURCE_ASSET="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["asset_name"])')"
           gh release create "${{ steps.plan.outputs.tag }}" \
             --title "${{ steps.plan.outputs.tag }}" \
             --target "$GITHUB_SHA" \
             --notes-file dist/release-notes.md \
-            dist/r8125-${{ steps.plan.outputs.driver_version }}.tar.* \
-            dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb \
-            dist/SHA256SUMS \
-            dist/provenance.json \
-            dist/release-notes.md
+            "dist/$SOURCE_ASSET#Verified upstream driver source" \
+            "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb#DKMS package - download this" \
+            "dist/SHA256SUMS#SHA-256 checksums" \
+            "dist/provenance.json#Build provenance" \
+            "dist/release-notes.md#Release notes"
         env:
           GH_TOKEN: ${{ github.token }}
