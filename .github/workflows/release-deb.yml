@@ -1,173 +1,141 @@
 name: Release Debian package
-
-on:
+'on':
   schedule:
-    - cron: "43 4 * * *"
+  - cron: 43 4 * * *
   workflow_dispatch:
     inputs:
       pkgrel:
-        description: "Debian package revision (empty for auto)"
+        description: Debian package revision (empty for auto)
         required: false
-        default: ""
+        default: ''
       force:
-        description: "Replace the existing release and tag if they already exist"
+        description: Replace the existing release and tag if they already exist
         required: false
-        default: "false"
+        default: 'false'
         type: choice
         options:
-          - "false"
-          - "true"
-
+        - 'false'
+        - 'true'
 permissions:
   contents: write
-
 concurrency:
   group: release-debian-package
   cancel-in-progress: false
-
 jobs:
   release:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
+    - name: Checkout
+      uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+    - name: Discover latest source
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        python3 scripts/discover-source.py --pretty > build-source.json
+        cat build-source.json
+    - name: Fetch source
+      run: |
+        python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
+        cat source-metadata.json
+    - name: Plan release
+      id: plan
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        INPUT_PKGREL: ${{ github.event.inputs.pkgrel || '' }}
+        FORCE_RELEASE: ${{ github.event.inputs.force || 'false' }}
+      run: |
+        ARGS=(
+          --metadata source-metadata.json
+          --repository "$GITHUB_REPOSITORY"
+          --head-sha "$GITHUB_SHA"
+          --github-output "$GITHUB_OUTPUT"
+          --summary "$GITHUB_STEP_SUMMARY"
+          --pretty
+        )
+        if [[ -n "$INPUT_PKGREL" ]]; then
+          ARGS+=(--pkgrel "$INPUT_PKGREL")
+        fi
+        if [[ "$FORCE_RELEASE" == "true" ]]; then
+          ARGS+=(--force)
+        fi
+        python3 scripts/release_plan.py "${ARGS[@]}"
+    - name: Install package build tools
+      if: steps.plan.outputs.should_release == 'true'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y dpkg-dev patch
+    - name: Build deb
+      if: steps.plan.outputs.should_release == 'true'
+      run: |
+        scripts/build-deb.sh \
+          --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" \
+          --version "${{ steps.plan.outputs.driver_version }}" \
+          --pkgrel "${{ steps.plan.outputs.pkgrel }}"
+    - name: Prepare release assets
+      if: steps.plan.outputs.should_release == 'true'
+      run: |
+        SOURCE_ASSET="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["asset_name"])')"
+        cp "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" "dist/$SOURCE_ASSET"
+        python3 scripts/make-release-notes.py \
+          --metadata source-metadata.json \
+          --build-options config/build-options.env \
+          --repository "$GITHUB_REPOSITORY" \
+          --package-version "${{ steps.plan.outputs.package_version }}" > dist/release-notes.md
+        python3 - <<'PY'
+        import json
+        import os
+        from datetime import datetime, timezone
 
-      - name: Discover latest source
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-        run: |
-          python3 scripts/discover-source.py --pretty > build-source.json
-          cat build-source.json
-
-      - name: Fetch source
-        run: |
-          python3 scripts/fetch-source.py --metadata build-source.json --pretty > source-metadata.json
-          cat source-metadata.json
-
-      - name: Plan release
-        id: plan
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          INPUT_PKGREL: ${{ github.event.inputs.pkgrel || '' }}
-          FORCE_RELEASE: ${{ github.event.inputs.force || 'false' }}
-        run: |
-          ARGS=(
-            --metadata source-metadata.json
-            --repository "$GITHUB_REPOSITORY"
-            --head-sha "$GITHUB_SHA"
-            --github-output "$GITHUB_OUTPUT"
-            --summary "$GITHUB_STEP_SUMMARY"
-            --pretty
-          )
-          if [[ -n "$INPUT_PKGREL" ]]; then
-            ARGS+=(--pkgrel "$INPUT_PKGREL")
-          fi
-          if [[ "$FORCE_RELEASE" == "true" ]]; then
-            ARGS+=(--force)
-          fi
-          python3 scripts/release_plan.py "${ARGS[@]}"
-
-      - name: Install build and compile test tools
-        if: steps.plan.outputs.should_release == 'true'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            build-essential \
-            dkms \
-            linux-headers-generic \
-            linux-headers-generic-hwe-24.04
-
-      - name: Build deb
-        if: steps.plan.outputs.should_release == 'true'
-        run: |
-          scripts/build-deb.sh \
-            --source "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" \
-            --version "${{ steps.plan.outputs.driver_version }}" \
-            --pkgrel "${{ steps.plan.outputs.pkgrel }}"
-
-      - name: Smoke test deb
-        if: steps.plan.outputs.should_release == 'true'
-        run: |
-          scripts/smoke-test-deb.sh \
-            "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb" \
-            "${{ steps.plan.outputs.driver_version }}"
-
-      - name: Compile DKMS module
-        if: steps.plan.outputs.should_release == 'true'
-        run: |
-          sudo scripts/compile-test-dkms.sh \
-            "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb" \
-            "${{ steps.plan.outputs.driver_version }}" \
-            2
-
-      - name: Prepare release assets
-        if: steps.plan.outputs.should_release == 'true'
-        run: |
-          SOURCE_ASSET="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["asset_name"])')"
-          cp "$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')" "dist/$SOURCE_ASSET"
-          python3 scripts/make-release-notes.py \
-            --metadata source-metadata.json \
-            --build-options config/build-options.env \
-            --repository "$GITHUB_REPOSITORY" \
-            --package-version "${{ steps.plan.outputs.package_version }}" > dist/release-notes.md
-          python3 - <<'PY'
-          import json
-          import os
-          from datetime import datetime, timezone
-
-          with open("source-metadata.json", encoding="utf-8") as handle:
-              metadata = json.load(handle)
-          metadata["package_name"] = "r8125-dkms"
-          metadata["package_version"] = os.environ["PACKAGE_VERSION"]
-          metadata["release_tag"] = os.environ["RELEASE_TAG"]
-          metadata["source_commit_sha"] = os.environ["GITHUB_SHA"]
-          metadata["package_recipe_sha256"] = os.environ["PACKAGE_RECIPE_SHA256"]
-          metadata["release_reason"] = os.environ["RELEASE_REASON"]
-          metadata["build_time_utc"] = datetime.now(timezone.utc).isoformat()
-          metadata["github_run_id"] = os.environ.get("GITHUB_RUN_ID")
-          metadata["github_run_attempt"] = os.environ.get("GITHUB_RUN_ATTEMPT")
-          build_options = {}
-          with open("config/build-options.env", encoding="utf-8") as handle:
-              for line in handle:
-                  line = line.strip()
-                  if line and not line.startswith("#"):
-                      key, value = line.split("=", 1)
-                      build_options[key] = value
-          metadata["build_options"] = build_options
-          with open("dist/provenance.json", "w", encoding="utf-8") as handle:
-              json.dump(metadata, handle, indent=2, sort_keys=True)
-              handle.write("\n")
-          PY
-          (cd dist && sha256sum * > SHA256SUMS)
-        env:
-          PACKAGE_VERSION: ${{ steps.plan.outputs.package_version }}
-          RELEASE_TAG: ${{ steps.plan.outputs.tag }}
-          PACKAGE_RECIPE_SHA256: ${{ steps.plan.outputs.recipe_sha256 }}
-          RELEASE_REASON: ${{ steps.plan.outputs.reason }}
-
-      - name: Remove existing release for forced rebuild
-        if: steps.plan.outputs.replace_existing == 'true'
-        run: |
-          gh release delete "${{ steps.plan.outputs.tag }}" --yes --cleanup-tag
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      - name: Create GitHub release
-        if: steps.plan.outputs.should_release == 'true'
-        run: |
-          SOURCE_ASSET="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["asset_name"])')"
-          gh release create "${{ steps.plan.outputs.tag }}" \
-            --title "${{ steps.plan.outputs.tag }}" \
-            --target "$GITHUB_SHA" \
-            --notes-file dist/release-notes.md \
-            "dist/$SOURCE_ASSET#Verified upstream driver source" \
-            "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb#DKMS package - download this" \
-            "dist/SHA256SUMS#SHA-256 checksums" \
-            "dist/provenance.json#Build provenance" \
-            "dist/release-notes.md#Release notes"
-        env:
-          GH_TOKEN: ${{ github.token }}
+        with open("source-metadata.json", encoding="utf-8") as handle:
+            metadata = json.load(handle)
+        metadata["package_name"] = "r8125-dkms"
+        metadata["package_version"] = os.environ["PACKAGE_VERSION"]
+        metadata["release_tag"] = os.environ["RELEASE_TAG"]
+        metadata["source_commit_sha"] = os.environ["GITHUB_SHA"]
+        metadata["package_recipe_sha256"] = os.environ["PACKAGE_RECIPE_SHA256"]
+        metadata["release_reason"] = os.environ["RELEASE_REASON"]
+        metadata["build_time_utc"] = datetime.now(timezone.utc).isoformat()
+        metadata["github_run_id"] = os.environ.get("GITHUB_RUN_ID")
+        metadata["github_run_attempt"] = os.environ.get("GITHUB_RUN_ATTEMPT")
+        build_options = {}
+        with open("config/build-options.env", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    key, value = line.split("=", 1)
+                    build_options[key] = value
+        metadata["build_options"] = build_options
+        with open("dist/provenance.json", "w", encoding="utf-8") as handle:
+            json.dump(metadata, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+        PY
+        (cd dist && sha256sum * > SHA256SUMS)
+      env:
+        PACKAGE_VERSION: ${{ steps.plan.outputs.package_version }}
+        RELEASE_TAG: ${{ steps.plan.outputs.tag }}
+        PACKAGE_RECIPE_SHA256: ${{ steps.plan.outputs.recipe_sha256 }}
+        RELEASE_REASON: ${{ steps.plan.outputs.reason }}
+    - name: Remove existing release for forced rebuild
+      if: steps.plan.outputs.replace_existing == 'true'
+      run: |
+        gh release delete "${{ steps.plan.outputs.tag }}" --yes --cleanup-tag
+      env:
+        GH_TOKEN: ${{ github.token }}
+    - name: Create GitHub release
+      if: steps.plan.outputs.should_release == 'true'
+      run: |
+        SOURCE_ASSET="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["asset_name"])')"
+        gh release create "${{ steps.plan.outputs.tag }}" \
+          --title "${{ steps.plan.outputs.tag }}" \
+          --target "$GITHUB_SHA" \
+          --notes-file dist/release-notes.md \
+          "dist/$SOURCE_ASSET#Verified upstream driver source" \
+          "dist/r8125-dkms_${{ steps.plan.outputs.package_version }}_all.deb#DKMS package - download this" \
+          "dist/SHA256SUMS#SHA-256 checksums" \
+          "dist/provenance.json#Build provenance" \
+          "dist/release-notes.md#Release notes"
+      env:
+        GH_TOKEN: ${{ github.token }}

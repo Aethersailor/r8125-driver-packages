@@ -194,5 +194,4 @@ VERSION="$(python3 -c 'import json; print(json.load(open("source-metadata.json")
 SOURCE="$(python3 -c 'import json; print(json.load(open("source-metadata.json"))["source_path"])')"
 # 注意：以下示例使用了 9.016.01 修复包的 pkgrel 2。普通版本默认 pkgrel 为 1。
 scripts/build-deb.sh --source "$SOURCE" --version "$VERSION" --pkgrel 2
-scripts/smoke-test-deb.sh "dist/r8125-dkms_${VERSION}-2_all.deb" "$VERSION"
 ```
