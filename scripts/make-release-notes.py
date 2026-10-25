@@ -59,8 +59,10 @@ def render_release_notes(
         "",
         "> [!IMPORTANT]",
         f"> **普通用户只需下载并安装 [`{package_asset}`]({package_url})。**",
-        "> 页面底部由 GitHub 自动生成的 `Source code (zip)` 和 `Source code (tar.gz)` "
-        "是仓库快照，不是 DKMS 安装包。",
+        (
+            "> 页面底部由 GitHub 自动生成的 `Source code (zip)` 和 `Source code (tar.gz)` "
+            + "是仓库快照，不是 DKMS 安装包。"
+        ),
         "",
         "### 中文",
         "",

@@ -51,6 +51,10 @@ def main() -> int:
     parser.add_argument("--pretty", action="store_true")
     args = parser.parse_args()
 
+    if not args.metadata and (args.url or args.version or args.sha256):
+        if not (args.url and args.version and args.sha256):
+            parser.error("--url, --version, and --sha256 must be used together")
+
     if args.metadata:
         with open(args.metadata, encoding="utf-8") as handle:
             metadata = json.load(handle)
@@ -67,8 +71,6 @@ def main() -> int:
             "digest": f"sha256:{normalize_sha256(args.sha256)}",
             "prerelease": False,
         }
-    elif args.url or args.version or args.sha256:
-        parser.error("--url, --version, and --sha256 must be used together")
     else:
         result = subprocess.run(
             [sys.executable, "scripts/discover-source.py"],
